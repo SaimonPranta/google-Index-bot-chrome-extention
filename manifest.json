@@ -7,13 +7,14 @@
     "background": {
       "service_worker": "background.js"
     },
-    "content_scripts": [
-      {
-        "matches": ["<all_urls>"],
-        "js": ["content.js"],
-        "run_at": "document_idle"
-      }
-    ],
+   "content_scripts": [
+  {
+    "matches": ["<all_urls>"],
+    "js": ["xlsx.full.min.js", "content.js"],
+    "run_at": "document_idle"
+  }
+]
+,
     "action": {
       "default_popup": "index.html"
     }
