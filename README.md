@@ -1,0 +1,1 @@
+# autofy-bot-chrome-extensions 
