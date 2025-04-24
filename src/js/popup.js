@@ -69,7 +69,8 @@ const csvToJson = (csv) => {
 };
 // text-token-text-error
 const clickSubmitButton = async (jsonData = []) => {
-  const serverDomain = 'http://localhost:8001'
+  const serverDomain = 'https://server.somacharnews.com'
+  // const serverDomain = 'http://localhost:8001'
   const getUrl = async () => {
     try {
       let data = await fetch(
