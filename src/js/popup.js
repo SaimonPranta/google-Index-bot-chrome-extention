@@ -1,171 +1,228 @@
-document.getElementById("clickSubmit").addEventListener("click", () => {
+
+
+
+document.getElementById('csvInput').addEventListener('change', function (event) {
+  const file = event.target.files[0];
+  if (file) {
+    const submitButton = document.getElementById("clickSubmit");
+    const fileLabel = document.getElementById("file-label");
+    submitButton.disabled = false;
+    fileLabel.innerHTML = `Upload file: ${file.name}`
+
+  }
+});
+
+document.getElementById("clickSubmit").addEventListener("click", async () => {
+  const fileInput = document.getElementById(
+    'csvInput'
+  );
+  let jsonData = null
+
+  if (fileInput && fileInput.files.length > 0) {
+    jsonData = await fileToJson(fileInput.files[0]);
+  }
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     chrome.scripting.executeScript({
       target: { tabId: tabs[0].id },
       function: clickSubmitButton,
+      args: [jsonData]
     });
+
   });
 });
+const fileToJson = async (updatedFile) => {
+  try {
+    const csvData = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = function (e) {
+        resolve(e.target.result);
+      };
+
+      reader.onerror = function (e) {
+        reject(e);
+      };
+
+      reader.readAsText(updatedFile);
+    });
+
+    // Convert CSV string to JSON
+    const jsonData = csvToJson(csvData);
+    return jsonData;
+
+  } catch (error) {
+    console.error("Error parsing file:", error);
+    return [];
+  }
+};
+const csvToJson = (csv) => {
+  const lines = csv.trim().split('\n');
+  const headers = lines[0].split(',');
+
+  return lines.slice(1).map(line => {
+    const values = line.split(',');
+    return headers.reduce((obj, header, i) => {
+      obj[header.trim()] = values[i]?.trim() || '';
+      return obj;
+    }, {});
+  });
+};
 // text-token-text-error
-const clickSubmitButton = async () => {
-  const createProgressStatus = () => {
-    const style = document.createElement("style");
-    style.textContent = `
-      .autofy-bot-progress-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background: rgba(255, 255, 255, 0.9);
-        z-index: 9999;
-        transition: 0.5s;
+const clickSubmitButton = async (jsonData = []) => {
+  const serverDomain = 'http://localhost:8001'
+  const getUrl = async () => {
+    try {
+      let data = await fetch(
+        `${serverDomain}/chrome-extension/google-index-bot/get-collected-url`,
+        {
+          method: "GET",
+        }
+      );
+      data = await data.json()
+      console.log("data -->>", data)
+      return data
+    } catch (error) {
+      return
+    }
+  }
+  const updateIndexUrl = async (id) => {
+    try {
+      let data = await fetch(
+        `${serverDomain}/chrome-extension/google-index-bot/update-index-url?id=${id}`,
+        {
+          method: "GET",
+        }
+      );
+      data = await data.json()
+      console.log("data -->>", data)
+      return data
+    } catch (error) {
+      return
+    }
+  }
+  const waitHere = (time) => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve("done");
+      }, time || 100);
+    });
+  };
+  const checkRetrievingDataModalProgress = (time = 1000, selector) => {
+    return new Promise((resolve, reject) => {
+      if (!selector) {
+        resolve("Query selector are required");
       }
-  
-      .progress-container {
-        width: max-content;
-        max-width: 90vw;
-        border-radius: 10px;
-        background-color: #FFF;
-        border: 1px solid #e4e4e4;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 10px;
-        padding: 20px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      let intervalContainer = setInterval(() => {
+        const checkOutputProcessing = document.querySelector(selector);
+        if (!checkOutputProcessing) {
+          setTimeout(() => {
+            clearInterval(intervalContainer);
+            resolve("done");
+          }, time);
+        }
+      }, time);
+    });
+  };
+  const awaitForGetElement = (time = 1000, selector) => {
+    return new Promise((resolve, reject) => {
+      if (!selector) {
+        resolve("Query selector are required");
       }
-  
-      .progress-container input[type="file"] {
-        font-size: 14px;
-        padding: 6px;
+      let intervalContainer = setInterval(() => {
+        const checkOutputProcessing = document.querySelector(selector);
+        if (checkOutputProcessing) {
+          setTimeout(() => {
+            clearInterval(intervalContainer);
+            resolve("done");
+          }, time);
+        }
+      }, time);
+    });
+  };
+  const scrapeHandler = async () => {
+    try {
+      const { totalUrls, data } = await getUrl()
+      console.log("urlInfo -->>", data)
+      if (!data) {
+        return
       }
-  
-      .progress-container button {
-        padding: 6px 12px;
-        font-size: 14px;
-        cursor: pointer;
-        border: none;
-        background-color: #233090;
-        color: white;
-        border-radius: 5px;
-      }
-  
-      .progress-container button:hover {
-        background-color: #1b256f;
-      }
-    `;
-    document.head.appendChild(style);
+      const url = data.url
 
-    const parentDiv = document.querySelector("body");
-    const htmlString = `
-      <div class="autofy-bot-progress-container" id="progress-container">
-        <div class="progress-container">
-          <input type="file" />
-          <button id="index-request-submit-btn">Submit</button>
-        </div>
-      </div>
-    `;
-    const newElement = document.createElement("div");
-    newElement.innerHTML = htmlString;
-    parentDiv.appendChild(newElement);
+      const searchInputField = document.querySelector("input.Ax4B8.ZAGvjd");
+      if (searchInputField) {
+        console.log("hello if");
+        searchInputField.value = url
+        searchInputField.dispatchEvent(new Event("input", { bubbles: true }));
+        searchInputField.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      const searchButton = document.querySelector('button[aria-label="Search"]');
 
-    // Add click listener for Submit button
+      if (searchButton) {
+        searchButton.click();
+      }
+      const cancelButton = document.querySelector('button[data-mdc-dialog-action="cancel"]');
+
+      const retrieveModalSelector = `button[data-mdc-dialog-action="cancel"]`
+      await checkRetrievingDataModalProgress(2000, retrieveModalSelector)
+
+      await waitHere(5000)
+
+      const indexRequestButton = document.querySelector("span.cTsG4");
+      if (indexRequestButton) {
+        indexRequestButton.click();
+      }
+      await updateIndexUrl(data._id)
+
+      // <div jsslot="" class="uW2Fw-cnG4Wd" jsname="rZHESd"><div class="LKPgTd"><div class="UZY8u">Testing if live URL can be indexed</div><div jscontroller="oJz28e" class="ErQSec-qNpTzb-MkD1Ye S15xnb" data-progressvalue="0.2" data-buffervalue="1" jsname="N9Omdd" jsaction="transitionend:e204de"><div class="ErQSec-qNpTzb-P1ekSe ErQSec-qNpTzb-P1ekSe-OWXEXe-A9y3zc ErQSec-qNpTzb-P1ekSe-OWXEXe-OiiCO-IhfUye" role="progressbar" aria-label="Testing if live URL can be indexed" jsname="LbNpof"><div class="ErQSec-qNpTzb-BEcm3d-LK5yu" style="" jsname="XCKw4c"></div><div class="ErQSec-qNpTzb-OcUoKf-LK5yu" style="" jsname="IGn7me"></div><div class="ErQSec-qNpTzb-oLOYtf-uDEFge" jsname="NIZIe"></div><div class="ErQSec-qNpTzb-OcUoKf-qwU8Me" style="" jsname="YUkMeb"></div><div class="ErQSec-qNpTzb-BEcm3d-qwU8Me" style="" jsname="SBP9"><div class="ErQSec-qNpTzb-ajuXxc-RxYbNe"></div></div><div class="ErQSec-qNpTzb-Ejc3of-uDEFge" jsname="MMMbxf"></div></div></div><div class="YybJub">This might take a minute or two</div><div class="VfPpkd-dgl2Hf-ppHlrf-sM5MNb" data-is-touch-wrapper="true"><button class="mUIrbf-LgbsSe mUIrbf-LgbsSe-OWXEXe-dgl2Hf H7EDqc" jscontroller="O626Fe" jsaction="click:h5M12e; clickmod:h5M12e;pointerdown:FEiYhc;pointerup:mF5Elf;pointerenter:EX0mI;pointerleave:vpvbp;pointercancel:xyn4sd;contextmenu:xexox; focus:h06R8; blur:zjh6rb;mlnRJb:fLiPzd;" data-idom-class="H7EDqc" data-mdc-dialog-action="cancel"><span class="OiePBf-zPjgPe"></span><span class="RBHQF-ksKsZd" jscontroller="LBaJxb" jsname="m9ZlFb" soy-skip="" ssk="6:RWVI5c"></span><span class="mUIrbf-RLmnJb"></span><span class="mUIrbf-kBDsod-Rtc0Jf mUIrbf-kBDsod-Rtc0Jf-OWXEXe-M1Soyc" jsname="Xr1QTb"></span><span jsname="V67aGc" class="mUIrbf-vQzf8d">Cancel</span><span class="mUIrbf-kBDsod-Rtc0Jf mUIrbf-kBDsod-Rtc0Jf-OWXEXe-UbuQg" jsname="UkTUqb"></span></button></div></div></div>
+      
+      await checkRetrievingDataModalProgress(2000, retrieveModalSelector)
+      await waitHere(5000)
+      const dismissBtnSelector = `button[data-mdc-dialog-action="ok"]`
+      const dismissButton = document.querySelector(dismissBtnSelector);
+
+      console.log("dismissButton 1 ==>>", dismissButton)
+      await awaitForGetElement(1000, dismissBtnSelector)
+      console.log("dismissButton 2 ==>>", dismissButton)
+
+      if (dismissButton) {
+        dismissButton.click();
+      }
+      scrapeHandler()
+    } catch (error) {
+      scrapeHandler()
+    }
   };
 
-  const scrapeHandler = () => {
-    const searchInputField = document.querySelector("input.Ax4B8.ZAGvjd");
-    if (searchInputField) {
-      console.log("hello if");
-      searchInputField.value =
-        "https://somacharnews.com/news/680915df27070bc4e7aca4b7";
-      searchInputField.dispatchEvent(new Event("input", { bubbles: true }));
-      searchInputField.dispatchEvent(new Event("change", { bubbles: true }));
+
+  const saveToDB = async (jsonData) => {
+    try {
+      console.log("jsonData -->>", jsonData)
+      await fetch(
+        `${serverDomain}/chrome-extension/google-index-bot`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            data: jsonData
+          }),
+        }
+      );
+      return
+    } catch (error) {
+      console.log("error ---->>>", error)
+      return
     }
-    const searchButton = document.querySelector('button[aria-label="Search"]');
-
-    if (searchButton) {
-      searchButton.click();
-    }
-    console.log("hello form before time");
-
-    setTimeout(() => {
-      console.log("time complete");
-    }, 2000);
-    console.log("hello form after time");
-    const indexRequestButton = document.querySelector("span.cTsG4");
-    //  const indexRequestButton = document.querySelector('span.cTsG4');
-    if (indexRequestButton) {
-      indexRequestButton.click();
-    }
-  };
-
-  const processProgress = () => {
-    scrapeHandler();
-  };
-  const readExcelFile = (file) => {
-    const reader = new FileReader();
-    // console.log("XLSX available?", typeof XLSX); // should log 'function' or 'object'
-
-    reader.onload = (e) => {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-  
-      // Get the first sheet
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-  
-      // Convert to JSON
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-      console.log("Excel Data:", jsonData);
-    };
-  
-    reader.readAsArrayBuffer(file);
   }
 
-  const handleNextProcess = () => {
-    document
-      .getElementById("index-request-submit-btn")
-      .addEventListener("click", () => {
-        const fileInput = document.querySelector(
-          '#progress-container input[type="file"]'
-        );
-        let updatedFile = null
-        if (fileInput && fileInput.files.length > 0) {
-           updatedFile = fileInput.files[0]; // Store the selected file
-          console.log("Selected File:", updatedFile);
-        }
-        const container = document.getElementById("progress-container");
-        if (container) container.remove(); // Hide modal
-        // if (typeof processStarted === "function") processStarted(); // Call your function
-
-        console.log("Hello 999999999");
-
-        if ( updatedFile && updatedFile.name.endsWith(".xlsx")) {
-          readExcelFile(updatedFile);
-        } else {
-          console.warn("Please select a valid .xlsx file");
-        }
-        
-
-
-
-      });
-  };
   try {
-    createProgressStatus();
-    handleNextProcess();
-    return;
-    //This is Real Function Section
-    if (window.continueScraping) {
-      return;
-    }
-    window.continueScraping = true;
-
-    await processProgress();
+    // if (window.continueScraping) {
+    //   return;
+    // }
+    // window.continueScraping = true;
+    await saveToDB(jsonData)
+    await scrapeHandler();
   } catch (error) {
     console.log("Error form clickSubmitButton :-", error);
   }

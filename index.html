@@ -6,7 +6,11 @@
 
   </head>
   <body class="popup-page">
-    <button class="start-btn" id="clickSubmit">Run</button>
+    <div class="upload-container">
+      <label id="file-label">Upload CSV File</label>
+      <input type="file" id="csvInput" accept=".csv" />
+    </div>
+    <button class="start-btn" disabled id="clickSubmit">Run</button>
 
     <script  src="./src/js/popup.js"></script>
   </body>
